@@ -6,13 +6,20 @@ const fs = require('fs');
 const multer = require('multer');
 const session = require('express-session');
 
+const requiredEnv = ['DB_PASSWORD', 'SESSION_SECRET'];
+const missingEnv = requiredEnv.filter((name) => !process.env[name]);
+
+if (missingEnv.length > 0) {
+  throw new Error(`Missing required environment variables: ${missingEnv.join(', ')}`);
+}
+
 // Create uploads directory if it doesn't exist
 const uploadDir = path.join(__dirname, 'public/uploads');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// Configure multer for file uploads
+// Configure multer for the lab upload workflow.
 const storage = multer.diskStorage({
   destination: function(req, file, cb) {
     cb(null, uploadDir);
@@ -21,9 +28,10 @@ const storage = multer.diskStorage({
     cb(null, Date.now() + '-' + file.originalname);
   }
 });
-const upload = multer({ 
-  storage: storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) {
       cb(null, true);
@@ -36,25 +44,24 @@ const upload = multer({
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Database configuration
+// Database configuration. Real credentials must be injected by the environment.
 const db = mysql.createConnection({
   host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || 'Otomasi-13',
+  password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME || 'loginapp'
 });
 
-// Connect to database
 db.connect(err => {
   if (err) {
     console.error('Database connection failed: ' + err.stack);
     return;
   }
+
   console.log('Connected to database');
-  
-  db.query(`SET FOREIGN_KEY_CHECKS=0;`);
-  
-  // Create users table if it doesn't exist
+
+  db.query('SET FOREIGN_KEY_CHECKS=0;');
+
   db.query(`
     CREATE TABLE IF NOT EXISTS users (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -64,8 +71,7 @@ db.connect(err => {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);
-  
-  // Create uploads table
+
   db.query(`
     CREATE TABLE IF NOT EXISTS uploads (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -76,29 +82,21 @@ db.connect(err => {
       FOREIGN KEY (user_id) REFERENCES users(id)
     )
   `);
-  
-  db.query(`SET FOREIGN_KEY_CHECKS=1;`);
-  
-  // Insert a test user
-  db.query(`
-    INSERT IGNORE INTO users (username, password, email) 
-    VALUES ('admin', 'admin123', 'admin@example.com')
-  `);
+
+  db.query('SET FOREIGN_KEY_CHECKS=1;');
 });
 
-// Session middleware
 app.use(session({
-  secret: 'your-secret-key',
+  secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 3600000 } // 1 hour
+  cookie: { maxAge: 3600000 }
 }));
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Authentication middleware
 const isAuthenticated = (req, res, next) => {
   if (req.session && req.session.userId) {
     return next();
@@ -106,14 +104,13 @@ const isAuthenticated = (req, res, next) => {
   res.status(401).json({ success: false, message: 'Authentication required' });
 };
 
-// Register route
 app.post('/register', (req, res) => {
   const { username, password, email } = req.body;
-  
+
   if (!username || !password) {
     return res.status(400).json({ success: false, message: 'Username and password are required' });
   }
-  
+
   db.query(
     'INSERT INTO users (username, password, email) VALUES (?, ?, ?)',
     [username, password, email],
@@ -124,24 +121,23 @@ app.post('/register', (req, res) => {
         }
         return res.status(500).json({ success: false, message: 'Database error' });
       }
-      
-      res.json({ 
-        success: true, 
+
+      res.json({
+        success: true,
         message: 'Registration successful! Please login.',
-        userId: results.insertId 
+        userId: results.insertId
       });
     }
   );
 });
 
-// Login route
 app.post('/login', (req, res) => {
   const { username, password } = req.body;
-  
+
   if (!username || !password) {
     return res.status(400).json({ success: false, message: 'Username and password are required' });
   }
-  
+
   db.query(
     'SELECT * FROM users WHERE username = ? AND password = ?',
     [username, password],
@@ -149,26 +145,24 @@ app.post('/login', (req, res) => {
       if (err) {
         return res.status(500).json({ success: false, message: 'Database error' });
       }
-      
+
       if (results.length > 0) {
-        // Set session
         req.session.userId = results[0].id;
         req.session.username = results[0].username;
-        
-        return res.json({ 
-          success: true, 
+
+        return res.json({
+          success: true,
           message: 'Login successful!',
           userId: results[0].id,
           username: results[0].username
         });
-      } else {
-        return res.status(401).json({ success: false, message: 'Invalid credentials' });
       }
+
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
   );
 });
 
-// Logout route
 app.get('/logout', (req, res) => {
   req.session.destroy((err) => {
     if (err) {
@@ -178,16 +172,15 @@ app.get('/logout', (req, res) => {
   });
 });
 
-// Upload image route (protected)
 app.post('/upload', isAuthenticated, upload.single('image'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ success: false, message: 'No image uploaded' });
   }
-  
+
   const userId = req.session.userId;
   const filename = req.file.filename;
   const originalName = req.file.originalname;
-  
+
   db.query(
     'INSERT INTO uploads (user_id, filename, original_name) VALUES (?, ?, ?)',
     [userId, filename, originalName],
@@ -195,24 +188,23 @@ app.post('/upload', isAuthenticated, upload.single('image'), (req, res) => {
       if (err) {
         return res.status(500).json({ success: false, message: 'Database error' });
       }
-      
+
       res.json({
-        success: true, 
+        success: true,
         message: 'Upload successful!',
         file: {
           id: result.insertId,
-          filename: filename,
-          originalName: originalName
+          filename,
+          originalName
         }
       });
     }
   );
 });
 
-// Get user uploads (protected)
 app.get('/uploads', isAuthenticated, (req, res) => {
   const userId = req.session.userId;
-  
+
   db.query(
     'SELECT * FROM uploads WHERE user_id = ? ORDER BY upload_date DESC',
     [userId],
@@ -220,16 +212,12 @@ app.get('/uploads', isAuthenticated, (req, res) => {
       if (err) {
         return res.status(500).json({ success: false, message: 'Database error' });
       }
-      
-      res.json({
-        success: true,
-        uploads: results
-      });
+
+      res.json({ success: true, uploads: results });
     }
   );
 });
 
-// Check authentication status
 app.get('/auth/status', (req, res) => {
   if (req.session && req.session.userId) {
     return res.json({
@@ -238,10 +226,10 @@ app.get('/auth/status', (req, res) => {
       userId: req.session.userId
     });
   }
+
   res.json({ authenticated: false });
 });
 
-// Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
