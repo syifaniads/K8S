@@ -36,6 +36,11 @@ spec:
             secretKeyRef:
               name: mysql-secret
               key: MYSQL_DATABASE
+        - name: SESSION_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: mysql-secret
+              key: SESSION_SECRET
         livenessProbe:
           httpGet:
             path: /health
