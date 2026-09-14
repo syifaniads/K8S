@@ -6,11 +6,11 @@ The **Autoscaling K8S** assignment was completed as a three-person group project
 
 ## Team
 
-| Member | Student ID | Role |
-|---|---|---|
-| **Syifani Adillah Salsabila** | 235150207111052 | **Group Lead / Ketua Kelompok** |
-| Latifa Anggia Fitriana | 235150201111062 | Team Member |
-| Jonathan Salim | 235150207111065 | Team Member |
+| Member | Role |
+|---|---|
+| **Syifani Adillah Salsabila** | **Group Lead / Ketua Kelompok** |
+| Latifa Anggia Fitriana | Team Member |
+| Jonathan Salim | Team Member |
 
 Syifani served as **Ketua Kelompok / Group Lead**, coordinating the group coursework while also participating in the technical lab work.
 
