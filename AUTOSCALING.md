@@ -19,6 +19,30 @@ It targets `Deployment/login-app` and retains the following settings:
 
 The scale-down behavior includes two policies—percentage based and pod-count based—and selects the minimum policy. This makes scale-in deliberately more conservative than scale-out.
 
+## Resource baseline
+
+The repository also retains `k8s-login-app/k8s/cpu-patch.yaml`:
+
+```yaml
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+```
+
+This matters because a percentage-based CPU HPA evaluates utilization relative to the container's requested CPU.
+
+For the retained lab values, an 80% target against a `100m` request corresponds to roughly `80m` average CPU usage per pod as the target reference point. That is a configuration interpretation, not a measured benchmark result.
+
+Apply the resource patch before evaluating percentage-based CPU HPA behavior:
+
+```bash
+kubectl patch deployment login-app --patch-file k8s-login-app/k8s/cpu-patch.yaml
+```
+
 ## Control loop
 
 ```mermaid
@@ -34,12 +58,6 @@ sequenceDiagram
     HPA->>DEP: update desired replica count
     DEP->>APP: create or remove Pods
 ```
-
-## Why resource requests matter
-
-CPU-utilization HPA uses utilization relative to requested CPU. For a meaningful experiment, the workload deployment should define CPU requests. The repository retains a CPU patch / workload configuration used for the autoscaling exercise.
-
-Without resource requests, percentage-based CPU utilization can become unavailable or misleading.
 
 ## Suggested verification flow
 
@@ -64,7 +82,12 @@ Generate controlled traffic against the service while watching HPA and pod state
 
 ## What can be claimed from the repository
 
-The retained manifest is evidence that the lab configured CPU-based HPA with explicit replica bounds and stabilization behavior.
+The retained manifests are evidence that the lab configured:
+
+- CPU requests and limits for the web workload;
+- CPU-based HPA;
+- explicit minimum/maximum replicas;
+- explicit stabilization behavior.
 
 The repository does **not** currently retain a structured benchmark dataset proving a specific requests-per-second threshold, scaling latency, or throughput improvement. Those figures should not be invented for a CV or portfolio.
 
