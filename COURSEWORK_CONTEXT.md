@@ -4,13 +4,25 @@
 
 This repository is connected to FILKOM Universitas Brawijaya DevOps / infrastructure coursework from May 2026.
 
-The user-provided assignment brief for **Autoscaling K8S** required students to work in groups of up to four, complete a worksheet, follow lecturer-provided Kubernetes material, document the work, and submit a PDF individually.
+The **Autoscaling K8S** assignment required students to work in groups of up to four, complete a worksheet, follow lecturer-provided Kubernetes material, document the work, and submit a PDF individually.
 
 The referenced lecturer material included:
 
 - `https://github.com/Widhi-yahya/kubernetes_installation_docker/blob/master/LB_DEPLOYMENT.md`
 
-The broader course sequence also included:
+## Group
+
+This coursework was completed by a three-person team:
+
+1. **Syifani Adillah Salsabila** — 235150207111052 — **Group Lead / Ketua Kelompok**
+2. Latifa Anggia Fitriana — 235150201111062
+3. Jonathan Salim — 235150207111065
+
+Syifani coordinated the group as **Ketua Kelompok** while also participating in the technical lab work and documentation.
+
+## Broader course sequence
+
+The same course sequence also included:
 
 - **Autoscaling K8S** — due 7 May 2026;
 - **IaC - Terraform** — due 14 May 2026;
@@ -32,7 +44,8 @@ The portfolio instead highlights what can be inspected directly in the retained 
 - metrics-server setup;
 - persistence configuration;
 - troubleshooting notes;
-- automation experiments.
+- automation experiments;
+- team coordination and implementation context.
 
 ## Why the original README was replaced
 
