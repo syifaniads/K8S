@@ -4,8 +4,11 @@
 [![Observability](https://img.shields.io/badge/metrics-Metrics%20Server-111827)](./OBSERVABILITY.md)
 [![Workload](https://img.shields.io/badge/workload-Node.js%20%2B%20MySQL-339933)](./ARCHITECTURE.md)
 [![Coursework](https://img.shields.io/badge/context-FILKOM%20DevOps%20Coursework-7A1FA2)](./COURSEWORK_CONTEXT.md)
+[![Role](https://img.shields.io/badge/role-Group%20Lead-0A66C2)](./TEAM_ATTRIBUTION.md)
 
 A hands-on infrastructure coursework repository for deploying a small web workload on Kubernetes and exploring **Horizontal Pod Autoscaling (HPA), service load balancing, ingress, health checks, storage, and cluster metrics**.
+
+**Syifani Adillah Salsabila served as Group Lead / Ketua Kelompok for this three-person team project**, while also participating in the technical lab work.
 
 This repository originated from FILKOM coursework in May 2026. The assignment explicitly asked students to follow lecturer-provided Kubernetes material, so this portfolio version separates:
 
@@ -14,6 +17,16 @@ This repository originated from FILKOM coursework in May 2026. The assignment ex
 3. **portfolio analysis**, which explains what the artifacts demonstrate and where the limitations are.
 
 > **Evidence rule:** documentation in this repository does not claim that every tutorial step or optional monitoring experiment was executed successfully. Claims are tied to retained manifests, application source, or explicit coursework context.
+
+## Team
+
+| Member | Role |
+|---|---|
+| **Syifani Adillah Salsabila** | **Group Lead / Ketua Kelompok** |
+| Latifa Anggia Fitriana | Team Member |
+| Jonathan Salim | Team Member |
+
+Full coursework identifiers and attribution notes are documented in [TEAM_ATTRIBUTION.md](./TEAM_ATTRIBUTION.md).
 
 ## What this repository demonstrates
 
@@ -151,7 +164,7 @@ The May 2026 assignment instructed students to follow lecturer-provided material
 - the lecturer's `LB_DEPLOYMENT.md` tutorial
 - a course worksheet submitted separately as PDF documentation
 
-For that reason, the original step-by-step installation/tutorial text is **not presented as original technical writing by Syifani**. The portfolio focuses instead on retained manifests, workload configuration, scaling policy, troubleshooting decisions, and the resulting infrastructure understanding.
+For that reason, the original step-by-step installation/tutorial text is **not presented as original technical writing by Syifani**. The portfolio focuses instead on retained manifests, workload configuration, scaling policy, troubleshooting decisions, team coordination, and the resulting infrastructure understanding.
 
 See [COURSEWORK_CONTEXT.md](./COURSEWORK_CONTEXT.md), [SOURCE_EVIDENCE.md](./SOURCE_EVIDENCE.md), and [TEAM_ATTRIBUTION.md](./TEAM_ATTRIBUTION.md).
 
@@ -169,7 +182,8 @@ See [SECURITY.md](./SECURITY.md).
 
 A concise recruiter-facing description:
 
-> **Kubernetes Autoscaling & Load-Balancing Lab** — Deployed a containerized Node.js/MySQL workload on a multi-node Kubernetes lab and configured service-based traffic distribution, health probes, persistent storage, Metrics Server, and an `autoscaling/v2` HPA with bounded replica scaling and stabilization policies. Extended the lab with ingress, load-balancing verification, monitoring notes, and deployment automation experiments.
+> **Kubernetes Autoscaling & Load-Balancing Lab — Group Lead** — Led a three-person FILKOM coursework team deploying a containerized Node.js/MySQL workload on a multi-node Kubernetes lab. Configured service-based traffic distribution, health probes, persistent storage, Metrics Server, and an `autoscaling/v2` HPA with bounded replica scaling and stabilization policies; extended the lab with ingress, load-balancing verification, monitoring notes, and deployment automation experiments.
 
 **Project type:** Infrastructure / Kubernetes / DevOps coursework  
+**Role:** Group Lead / Ketua Kelompok  
 **Context:** FILKOM Universitas Brawijaya — May 2026
