@@ -81,6 +81,8 @@ The retained HPA targets `Deployment/login-app` using `autoscaling/v2`.
 | Minimum replicas | 2 |
 | Maximum replicas | 4 |
 | CPU target | 80% average utilization |
+| CPU request baseline | 100m |
+| CPU limit | 500m |
 | Scale-up stabilization | 60 seconds |
 | Scale-down stabilization | 300 seconds |
 | Scale-down policy | conservative, minimum selected policy |
@@ -132,8 +134,11 @@ See [OBSERVABILITY.md](./OBSERVABILITY.md).
 | HPA and scaling behavior | [AUTOSCALING.md](./AUTOSCALING.md) |
 | Service / Ingress traffic distribution | [LOAD_BALANCING.md](./LOAD_BALANCING.md) |
 | Metrics and monitoring | [OBSERVABILITY.md](./OBSERVABILITY.md) |
+| Sanitized deployment walkthrough | [DEPLOYMENT.md](./DEPLOYMENT.md) |
+| Ansible automation experiment | [ANSIBLE_AUTOMATION.md](./ANSIBLE_AUTOMATION.md) |
 | Coursework provenance | [COURSEWORK_CONTEXT.md](./COURSEWORK_CONTEXT.md) |
 | Evidence map | [SOURCE_EVIDENCE.md](./SOURCE_EVIDENCE.md) |
+| Team / collaboration attribution | [TEAM_ATTRIBUTION.md](./TEAM_ATTRIBUTION.md) |
 | Security review | [SECURITY.md](./SECURITY.md) |
 | Limitations / non-claims | [LIMITATIONS.md](./LIMITATIONS.md) |
 | Portfolio / CV copy | [PORTFOLIO.md](./PORTFOLIO.md) |
@@ -148,11 +153,13 @@ The May 2026 assignment instructed students to follow lecturer-provided material
 
 For that reason, the original step-by-step installation/tutorial text is **not presented as original technical writing by Syifani**. The portfolio focuses instead on retained manifests, workload configuration, scaling policy, troubleshooting decisions, and the resulting infrastructure understanding.
 
-See [COURSEWORK_CONTEXT.md](./COURSEWORK_CONTEXT.md) and [SOURCE_EVIDENCE.md](./SOURCE_EVIDENCE.md).
+See [COURSEWORK_CONTEXT.md](./COURSEWORK_CONTEXT.md), [SOURCE_EVIDENCE.md](./SOURCE_EVIDENCE.md), and [TEAM_ATTRIBUTION.md](./TEAM_ATTRIBUTION.md).
 
 ## Security cleanup
 
 The historical lab documentation contained environment-specific IP addresses, demo credentials, and a database password. The portfolio version removes those values from the current branch and replaces them with placeholders or environment variables.
+
+The demo application now requires `DB_PASSWORD` and `SESSION_SECRET` from the environment rather than embedding the historical lab values, and the Kubernetes Secret manifest contains placeholders only.
 
 Historical commits may still preserve old coursework values, so **none of those values should ever be reused**.
 
