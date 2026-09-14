@@ -1,240 +1,35 @@
-# UPGRADE KUBERNETES CLUSTER
+# Kubernetes Upgrade Notes — Archived Coursework Reference
 
-Below are the steps we need to perform for upgrading the **Kubernetes** cluster.
+This file originally contained a generic, exam-oriented Kubernetes upgrade walkthrough targeting Kubernetes **v1.20.4**.
 
-Note: This document is only from the exam point of view and for upgrading production based clusters, we need to take more points into consideration.
+It is retained only as historical coursework context. It is **not** part of the recruiter-facing autoscaling implementation and should not be used as a current cluster-upgrade runbook.
 
+Kubernetes upgrade procedures are version-sensitive. For any real cluster, use the official documentation for the exact source and target versions:
 
-Get the detailed information about the upgrade process from the below-mentioned website.
+https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/
 
-[Kubernetes](https://kubernetes.io)
+## Why the old commands were removed from the current branch
 
- 
+The historical document:
 
-## UPGRADE CONTROLPLANE NODE
+- targeted an old Kubernetes release;
+- used example node names from generic training material;
+- was explicitly written from an exam/tutorial perspective;
+- could be misleading if copied into a modern environment.
 
+Git history preserves the original coursework text if provenance is required.
 
-```bash
+## General upgrade concepts retained from the exercise
 
-# Update the repositiry
+A kubeadm-based upgrade normally requires version-specific planning around:
 
-sudo apt update
+1. control-plane compatibility;
+2. `kubeadm` upgrade planning;
+3. draining nodes before kubelet changes;
+4. upgrading control-plane nodes before workers according to supported skew rules;
+5. upgrading `kubelet` / `kubectl` at supported versions;
+6. validating workloads and cluster health;
+7. uncordoning nodes after successful verification;
+8. avoiding simultaneous worker disruption when availability matters.
 
-
-
-# Check for the lastest kubernetes release versions
-
-sudo apt-cache madison kubeadm
-
-```
-
-**UPGRADE KUBEADM**
-
- 
-```bash
-
-# Unholds to upgrade kubeadm package
-
-sudo apt-mark unhold kubeadm
-
-
-# Install the new version of kubeadm, here the version is 1.20.4-00
-
-sudo apt update && sudo apt install -y kubeadm=1.20.4-00
-
- 
-# Hold the package to prevent accidential upgrade
-
-sudo apt-mark hold kubeadm
-
- 
-# Fetches the control plane component versions to which we can update to.
-
-sudo kubeadm upgrade plan
-
- 
-# Upgrade kubeadm
-
-sudo kubeadm upgrade apply v1.20.4
-
-```
-
- 
-
-**UPGRADE KUBECTL AND KUBELET**
- 
-
-```bash
-
-# Drain the control plane node
-
-kubectl drain manager --ignore-daemonsets
-
- 
-
-# Unholds to upgrade for kubelet and kubectl
-
-sudo apt-mark unhold kubelet kubectl
-
- 
-
-# Install the new version of kubelet and kubectl, here the version is 1.20.4-00
-
-sudo apt-get update && sudo apt-get install -y kubelet=1.20.4-00 kubectl=1.20.4-00
-
- 
-
-# Hold the package to prevent accidential upgrade
-
-sudo apt-mark hold kubelet kubectl
-
- 
-
-# Will reloads the systemd manager configuration
-
-sudo systemctl daemon-reload
-
- 
-
-# Will restart the kubelet service
-
-sudo systemctl restart kubelet
-
- 
-
-# Check the status of the service
-
-sudo systemctl status kubelet
-
- 
-
-# Uncordon the cntrol plane node.
-
-kubectl uncordon manager
-
-```
-
- 
-
-## UPGRADE WORKER NODES
-
-Note: worker nodes should not be upgraded simultaneously.
-
- 
-**UPGRADE KUBEADM**
-
- 
-> On Worker node
-
-```bash
-
-# Update the repositiry
-
-sudo apt update
-
- 
-
-# Unholds to upgrade kubeadm
-
-sudo apt-mark unhold kubeadm
-
- 
-
-# Install the new version of kubeadm, here the version is 1.20.4-00
-
-sudo apt update && sudo apt install -y kubeadm=1.20.4-00
-
- 
-
-# Hold the package to prevent upgrade
-
-sudo apt-mark hold kubeadm
-
- 
-
-# Upgrade the local configuration
-
-sudo kubeadm upgrade node
-
-```
-
- 
-
-**UPGRADE KUBECTL AND KUBELET**
-
- 
-> On control plane node
-
-```bash
-
-# Drain the worker1 node
-
-kubectl drain worker1 --ignore-daemonsets --delete-emptydir-data
-
-```
-
- 
-
-> On Worker node
-
-```bash
-
-# Unholds to upgrade kubelet and kubectl
-
-sudo apt-mark unhold kubelet kubectl
-
- 
-
-# Install the new version of kubelet and kubectl, here the version is 1.20.4-00
-
-sudo apt-get update && sudo apt-get install -y kubelet=1.20.4-00 kubectl=1.20.4-00
-
- 
-
-# Hold the package to prevent upgrade
-
-sudo apt-mark hold kubelet kubectl
-
- 
-
-# Will reload the systemd manager configuration
-
-sudo systemctl daemon-reload
-
- 
-
-# Will restart the kubelet service
-
-sudo systemctl restart kubelet
-
-```
-
- 
-
-> On control plane node
-
-```bash
-
-# Uncordon the worker node to bring it online and run the below command on control plane node.
-
-kubectl uncordon worker1
-
-```
-
- 
-
-Perform above steps on all the worker nodes to upgrade kubeadm, kubelet and kubectl.
-
- 
-
-> On control plane node
-
-```bash
-
-# Verify the cluster to list the updated nodes.
-
-kubectl get nodes
-
-```
-
-
+Those concepts are useful, but the exact commands must come from current Kubernetes documentation rather than this archived lab.
