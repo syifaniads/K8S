@@ -26,7 +26,7 @@ This repository originated from FILKOM coursework in May 2026. The assignment ex
 | Latifa Anggia Fitriana | Team Member |
 | Jonathan Salim | Team Member |
 
-Full coursework identifiers and attribution notes are documented in [TEAM_ATTRIBUTION.md](./TEAM_ATTRIBUTION.md).
+See [TEAM_ATTRIBUTION.md](./TEAM_ATTRIBUTION.md) for collaboration and attribution notes.
 
 ## What this repository demonstrates
 
