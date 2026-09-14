@@ -1,192 +1,167 @@
-# Deployment Guide for Login Web Application on Kubernetes
+# Deployment Guide
 
-This guide provides step-by-step instructions for deploying the login web application with MySQL database on Kubernetes. All configuration files are already included in the repository.
+This document keeps the original lab deployment flow but removes environment-specific IP addresses, usernames, and credentials.
 
-## 1. Clean Up Previous Deployments
+> This is an educational Kubernetes lab, not a production deployment recipe.
 
-First, clean up any previous deployments related to this project:
+## 1. Prerequisites
 
-```bash
-# Delete deployments
-kubectl delete deployment login-app mysql
+- a working Kubernetes control plane and at least one worker node;
+- `kubectl` configured for the cluster;
+- Docker available where the image is built/loaded;
+- Metrics Server if the HPA exercise will be used;
+- Calico or another functioning CNI;
+- local storage prepared if using the retained PV/PVC manifests.
 
-# Delete services
-kubectl delete service login-app mysql
+## 2. Configure lab secrets
 
-# Delete PVCs and PVs
-kubectl delete pvc mysql-pvc
-kubectl delete pv mysql-pv
+Before applying the manifests, edit:
 
-# Delete secrets
-kubectl delete secret mysql-secret
-```
-## 2. Build and Load Docker Image
+`k8s-login-app/k8s/mysql-secret.yaml`
 
-```bash
- git clone https://github.com/Widhi-yahya/kubernetes_installation_docker.git
-```
-Navigate to the app directory and build the Docker image:
+Replace all `REPLACE_ME` values with disposable lab secrets. Never commit real credentials.
+
+## 3. Build the workload image
 
 ```bash
-# Navigate to app directory
 cd k8s-login-app/app
-
-# Build Docker image
 docker build -t login-app:latest .
-
-# Save Docker image as TAR file for distribution to worker nodes
 docker save login-app:latest > login-app.tar
 ```
 
-If your worker nodes don't share the Docker registry with your control plane, transfer and load the image on all nodes:
+The retained workload uses `imagePullPolicy: Never`, so every node that may schedule the application needs access to the local image.
+
+Example transfer pattern:
 
 ```bash
-# Transfer the image to worker nodes (replace with actual node IPs)
-scp login-app.tar user@worker-node:/home/user/
-
-# On each worker node, load the image
-docker load < login-app.tar
+scp login-app.tar <user>@<worker-node>:/tmp/login-app.tar
+ssh <user>@<worker-node> 'docker load < /tmp/login-app.tar'
 ```
 
-## 3. Prepare Storage for MySQL
+For a modern shared environment, a registry is preferable to manual image distribution.
 
-Create a directory on your worker node to store MySQL data:
+## 4. Prepare local storage
+
+The retained MySQL configuration uses lab-oriented local storage. Prepare the configured host path on the appropriate node before applying the PV.
+
+Example:
 
 ```bash
-# Create a directory on your worker node for MySQL data (execute on worker node)
 sudo mkdir -p /mnt/data
-sudo chmod 777 /mnt/data
 ```
 
-## 4. Deploy MySQL Database
+Avoid world-writable permissions in real environments; use the minimum permissions required by the storage design.
 
-Apply the MySQL configurations:
+## 5. Deploy MySQL
 
 ```bash
-# Apply MySQL configurations
-kubectl apply -f k8s/mysql-secret.yaml
-kubectl apply -f k8s/mysql-pv.yaml
-kubectl apply -f k8s/mysql-pvc.yaml
-kubectl apply -f k8s/mysql-service.yaml
-kubectl apply -f k8s/mysql-deployment.yaml
+kubectl apply -f k8s-login-app/k8s/mysql-secret.yaml
+kubectl apply -f k8s-login-app/k8s/mysql-pv.yaml
+kubectl apply -f k8s-login-app/k8s/mysql-pvc.yaml
+kubectl apply -f k8s-login-app/k8s/mysql-service.yaml
+kubectl apply -f k8s-login-app/k8s/mysql-deployment.yaml
 
-# Check if MySQL pod is running
 kubectl get pods -l app=mysql
-
-# Wait for MySQL pod to be ready
 kubectl wait --for=condition=ready pod -l app=mysql --timeout=180s
 ```
 
-## 5. Deploy Web Application
-
-Deploy the web application after MySQL is running:
+## 6. Deploy the web workload
 
 ```bash
-# Apply web application configurations
-kubectl apply -f k8s/web-deployment.yaml
-kubectl apply -f k8s/web-service.yaml
+kubectl apply -f k8s-login-app/k8s/web-deployment.yaml
+kubectl apply -f k8s-login-app/k8s/web-service.yaml
 
-# Check if web application pods are running
 kubectl get pods -l app=login-app
-```
-
-## 6. Access the Application
-
-The application is exposed through a NodePort service on port 30080. You can access it from either node:
-
-```
-http://10.34.7.115:30080  (Master node)
-http://10.34.7.5:30080    (Worker node)
-```
-
-Both URLs work from any machine on your local network (10.34.7.0/24).
-
-## 7. Testing the Application
-
-1. Open your web browser and navigate to `http://10.34.7.115:30080`
-2. Register a new user or use the default credentials:
-   - Username: `admin`
-   - Password: `admin123`
-3. After login, you'll be redirected to the dashboard where you can upload images
-
-## 8. Important: Calico Networking Configuration
-
-The cluster uses Calico CNI with VXLAN. If you experience networking issues between nodes, ensure Calico is configured to detect the correct network interface:
-
-```bash
-# Fix Calico IP detection to use the correct interface
-kubectl set env daemonset/calico-node -n calico-system IP_AUTODETECTION_METHOD=can-reach=10.34.7.115
-
-# Restart calico-node pods to apply changes
-kubectl delete pod -n calico-system -l k8s-app=calico-node
-
-# Wait for calico-node pods to be ready
-kubectl wait --for=condition=ready pod -l k8s-app=calico-node -n calico-system --timeout=180s
-
-# Verify correct IPs are detected on all nodes
-kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.annotations.projectcalico\.org/IPv4Address}{"\n"}{end}'
-```
-
-## 9. Troubleshooting
-
-If you encounter issues:
-
-```bash
-# Check pod status
-kubectl get pods
-
-# Check MySQL logs
-kubectl logs -l app=mysql
-
-# Check web application logs
-kubectl logs -l app=login-app
-
-# Check MySQL connectivity from web app
-kubectl exec -it $(kubectl get pod -l app=login-app -o jsonpath='{.items[0].metadata.name}') -- sh -c 'nc -zv mysql 3306'
-
-# Check service configuration
 kubectl get svc
-
-# If database connection fails, restart login-app deployment
-kubectl rollout restart deployment login-app
-
-# Test DNS resolution from login-app pod
-kubectl exec -it $(kubectl get pods -l app=login-app -o name | head -1) -- nslookup mysql
-
-# Check Calico networking status
-kubectl get pods -n calico-system
 ```
 
-## 10. Database Management
-
-To manually manage the database:
+For the load-balancing variant:
 
 ```bash
-# Connect to MySQL
-kubectl exec -it $(kubectl get pod -l app=mysql -o jsonpath='{.items[0].metadata.name}') -- mysql -u root -p
-
-# Enter password: Otomasi-13
-
-# Then run MySQL commands
-USE loginapp;
-SHOW TABLES;
-SELECT * FROM users;
+kubectl apply -f k8s-login-app/k8s/web-deployment-lb.yaml
+kubectl apply -f k8s-login-app/k8s/web-service-lb.yaml
 ```
 
-## 11. Accessing the Application
+## 7. Apply Metrics Server and HPA
 
-### Login Application
-- **URL**: http://10.34.7.115:30080 or http://10.34.7.5:30080
-- **Default Credentials**: 
-  - Username: `admin`
-  - Password: `admin123`
+```bash
+kubectl apply -f metrics-server.yaml
+kubectl apply -f k8s-login-app/k8s/login-app-hpa.yaml
 
-### Kubernetes Dashboard
-- **URL**: https://10.34.7.115:30119 or https://10.34.7.5:30119
-- **Access Token**: Generate with:
-  ```bash
-  kubectl create token widhi -n kube-system --duration=24h
-  ```
-
-This completes the deployment of the login web application with MySQL on Kubernetes.
+kubectl top pods
+kubectl get hpa
+kubectl describe hpa login-app-hpa
 ```
+
+See [AUTOSCALING.md](./AUTOSCALING.md) for the retained HPA policy.
+
+## 8. Verify workload health
+
+```bash
+kubectl get deployment login-app
+kubectl get pods -l app=login-app -o wide
+kubectl describe deployment login-app
+kubectl logs -l app=login-app --tail=100
+```
+
+The deployment uses `/health` for readiness and liveness checks.
+
+## 9. Verify service distribution
+
+```bash
+kubectl get svc
+kubectl get endpoints
+kubectl get pods -l app=login-app -o wide
+```
+
+If using the server-identity experiment, send repeated requests to the service endpoint and compare which pod handles each request.
+
+See [LOAD_BALANCING.md](./LOAD_BALANCING.md).
+
+## 10. Troubleshooting
+
+### DNS / service discovery
+
+```bash
+kubectl exec -it $(kubectl get pods -l app=login-app -o name | head -1) -- nslookup mysql
+```
+
+### MySQL connectivity
+
+```bash
+kubectl logs -l app=mysql
+kubectl exec -it $(kubectl get pods -l app=login-app -o name | head -1) -- sh -c 'nc -zv mysql 3306'
+```
+
+### Metrics
+
+```bash
+kubectl get deployment metrics-server -n kube-system
+kubectl top nodes
+kubectl top pods
+kubectl describe hpa login-app-hpa
+```
+
+### CNI
+
+```bash
+kubectl get pods -A
+kubectl get nodes -o wide
+```
+
+If a CNI-specific change is required, use the actual cluster documentation rather than copying historical IP-specific commands from old lab notes.
+
+## 11. Cleanup
+
+```bash
+kubectl delete hpa login-app-hpa --ignore-not-found
+kubectl delete deployment login-app mysql --ignore-not-found
+kubectl delete service login-app mysql --ignore-not-found
+kubectl delete pvc mysql-pvc --ignore-not-found
+kubectl delete pv mysql-pv --ignore-not-found
+kubectl delete secret mysql-secret --ignore-not-found
+```
+
+## Security note
+
+Earlier coursework versions of this file contained private lab IP addresses and demo credentials. They have been removed from the current branch. Historical values must be treated as compromised and never reused.
