@@ -1,1 +1,20 @@
+# Environment / local secrets
+.env
+.env.*
+!.env.example
+
+# Node.js
+node_modules/
+npm-debug.log*
+
+# Lab build artifacts
+*.tar
+*.tgz
 k8s-login-app/app/login-app.tar
+
+# Runtime uploads
+k8s-login-app/app/public/uploads/
+
+# Editor / OS
+.DS_Store
+.vscode/
