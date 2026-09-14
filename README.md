@@ -1,285 +1,168 @@
-﻿# Kubernetes Installation on Ubuntu 22.04/24.04
+# Kubernetes Autoscaling & Load-Balancing Lab
 
-Get the detailed information about the installation from the below-mentioned websites of **Docker** and **Kubernetes**.
+[![Kubernetes](https://img.shields.io/badge/Kubernetes-HPA%20%2B%20Ingress-326CE5)](./AUTOSCALING.md)
+[![Observability](https://img.shields.io/badge/metrics-Metrics%20Server-111827)](./OBSERVABILITY.md)
+[![Workload](https://img.shields.io/badge/workload-Node.js%20%2B%20MySQL-339933)](./ARCHITECTURE.md)
+[![Coursework](https://img.shields.io/badge/context-FILKOM%20DevOps%20Coursework-7A1FA2)](./COURSEWORK_CONTEXT.md)
 
-[Docker](https://docs.docker.com/)
+A hands-on infrastructure coursework repository for deploying a small web workload on Kubernetes and exploring **Horizontal Pod Autoscaling (HPA), service load balancing, ingress, health checks, storage, and cluster metrics**.
 
-[Kubernetes](https://kubernetes.io/)
+This repository originated from FILKOM coursework in May 2026. The assignment explicitly asked students to follow lecturer-provided Kubernetes material, so this portfolio version separates:
 
-### Set up the Docker and Kubernetes repositories:
+1. **course/reference material**, which should not be interpreted as original authorship;
+2. **retained implementation artifacts** in this repository;
+3. **portfolio analysis**, which explains what the artifacts demonstrate and where the limitations are.
 
-### Requirements
-1. Ubuntu machines as Master and Worker ( build on VM using Bridge Adapter) minimal 2 machines: 1 Master and 1 Worker
-2. Networking uses local network (FILKOM)
+> **Evidence rule:** documentation in this repository does not claim that every tutorial step or optional monitoring experiment was executed successfully. Claims are tied to retained manifests, application source, or explicit coursework context.
 
+## What this repository demonstrates
 
+The retained project contains a small Node.js + MySQL application and Kubernetes manifests for:
 
-> Download the GPG key for docker
+- multi-replica application deployment;
+- Kubernetes Service-based traffic distribution;
+- NGINX Ingress experimentation;
+- readiness and liveness probes;
+- PersistentVolume / PersistentVolumeClaim-backed MySQL storage;
+- Metrics Server integration;
+- CPU-driven Horizontal Pod Autoscaling;
+- scale-up / scale-down stabilization behavior;
+- deployment troubleshooting and operational checks;
+- optional Ansible automation and Prometheus/Grafana exploration.
 
-```bash
-wget -O - https://download.docker.com/linux/ubuntu/gpg > ./docker.key
+The strongest autoscaling artifact is [`k8s-login-app/k8s/login-app-hpa.yaml`](./k8s-login-app/k8s/login-app-hpa.yaml):
 
-gpg --no-default-keyring --keyring ./docker.gpg --import ./docker.key
-
-gpg --no-default-keyring --keyring ./docker.gpg --export > ./docker-archive-keyring.gpg
-
-sudo mv ./docker-archive-keyring.gpg /etc/apt/trusted.gpg.d/
+```yaml
+minReplicas: 2
+maxReplicas: 4
+averageUtilization: 80
 ```
 
-> Add the docker repository and install docker
+The HPA also retains explicit stabilization behavior for scale-up and scale-down, which makes this more than a basic `kubectl autoscale` exercise.
 
-```bash
-# we can get the latest release versions from https://docs.docker.com
+## Architecture
 
-sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" -y
-sudo apt update -y
-sudo apt install git wget curl socat -y
-sudo apt install -y docker-ce
+```mermaid
+flowchart TB
+    USER[Client]
+    INGRESS[Ingress / NodePort]
+    SVC[Kubernetes Service]
+    P1[login-app Pod]
+    P2[login-app Pod]
+    PN[Additional Pods when HPA scales]
+    DB[(MySQL Pod)]
+    PVC[(Persistent Volume)]
+    MS[Metrics Server]
+    HPA[HorizontalPodAutoscaler]
 
+    USER --> INGRESS
+    INGRESS --> SVC
+    SVC --> P1
+    SVC --> P2
+    SVC --> PN
+    P1 --> DB
+    P2 --> DB
+    PN --> DB
+    DB --> PVC
+    MS --> HPA
+    HPA -->|adjust replicas| P1
+    HPA -->|adjust replicas| P2
+    HPA -->|scale out / in| PN
 ```
 
-**To install cri-dockerd for Docker support**
+See [ARCHITECTURE.md](./ARCHITECTURE.md).
 
-**Docker Engine does not implement the CRI which is a requirement for a container runtime to work with Kubernetes. For that reason, an additional service cri-dockerd has to be installed. cri-dockerd is a project based on the legacy built-in Docker Engine support that was removed from the kubelet in version 1.24.**
+## Autoscaling configuration
 
-> Get the version details
+The retained HPA targets `Deployment/login-app` using `autoscaling/v2`.
 
-```bash
-VER=$(curl -s https://api.github.com/repos/Mirantis/cri-dockerd/releases/latest|grep tag_name | cut -d '"' -f 4|sed 's/v//g')
-```
+| Setting | Retained value |
+|---|---:|
+| Minimum replicas | 2 |
+| Maximum replicas | 4 |
+| CPU target | 80% average utilization |
+| Scale-up stabilization | 60 seconds |
+| Scale-down stabilization | 300 seconds |
+| Scale-down policy | conservative, minimum selected policy |
 
-> Run below commands
+See [AUTOSCALING.md](./AUTOSCALING.md).
 
-```bash
+## Application workload
 
-wget https://github.com/Mirantis/cri-dockerd/releases/download/v${VER}/cri-dockerd-${VER}.amd64.tgz
+The repository includes a small Express application used as a workload for the Kubernetes exercises. It provides:
 
-tar xzvf cri-dockerd-${VER}.amd64.tgz
+- registration and login;
+- a protected dashboard flow;
+- image upload;
+- `/health` endpoint for Kubernetes probes;
+- MySQL persistence;
+- server/pod identification experiments for observing load balancing.
 
-sudo mv cri-dockerd/cri-dockerd /usr/local/bin/
+This application is a **lab workload**, not the primary portfolio claim. The infrastructure behavior is the focus.
 
-wget https://raw.githubusercontent.com/Mirantis/cri-dockerd/master/packaging/systemd/cri-docker.service
+## Load balancing
 
-wget https://raw.githubusercontent.com/Mirantis/cri-dockerd/master/packaging/systemd/cri-docker.socket
+The project retains:
 
-sudo mv cri-docker.socket cri-docker.service /etc/systemd/system/
+- a multi-replica `Deployment`;
+- a Kubernetes `Service`;
+- a load-balancing deployment variant;
+- an NGINX Ingress manifest;
+- pod and node identity exposure for observing request distribution;
+- readiness/liveness probes to keep unhealthy replicas out of service traffic.
 
-sudo sed -i -e 's,/usr/bin/cri-dockerd,/usr/local/bin/cri-dockerd,' /etc/systemd/system/cri-docker.service
+See [LOAD_BALANCING.md](./LOAD_BALANCING.md).
 
-sudo systemctl daemon-reload
-sudo systemctl enable cri-docker.service
-sudo systemctl enable --now cri-docker.socket
+## Metrics and observability
 
-```
+Metrics Server is retained in the repository because HPA needs resource metrics. The repository also contains Prometheus/Grafana setup notes as a broader monitoring experiment.
 
-> Add the GPG key for kubernetes
+The portfolio makes a distinction here:
 
-```bash
-curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
-```
+- **Metrics Server + HPA manifests:** retained implementation evidence;
+- **Prometheus/Grafana document:** monitoring setup/exploration, not proof that a persistent production monitoring stack was operated.
 
-> Add the kubernetes repository
+See [OBSERVABILITY.md](./OBSERVABILITY.md).
 
-```bash
-echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.31/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
-```
+## Repository navigation
 
-> Update the repository
+| Topic | Document |
+|---|---|
+| Architecture | [ARCHITECTURE.md](./ARCHITECTURE.md) |
+| HPA and scaling behavior | [AUTOSCALING.md](./AUTOSCALING.md) |
+| Service / Ingress traffic distribution | [LOAD_BALANCING.md](./LOAD_BALANCING.md) |
+| Metrics and monitoring | [OBSERVABILITY.md](./OBSERVABILITY.md) |
+| Coursework provenance | [COURSEWORK_CONTEXT.md](./COURSEWORK_CONTEXT.md) |
+| Evidence map | [SOURCE_EVIDENCE.md](./SOURCE_EVIDENCE.md) |
+| Security review | [SECURITY.md](./SECURITY.md) |
+| Limitations / non-claims | [LIMITATIONS.md](./LIMITATIONS.md) |
+| Portfolio / CV copy | [PORTFOLIO.md](./PORTFOLIO.md) |
 
-```bash
-# Update the repositiries
-sudo apt-get update
-```
+## Important source attribution
 
-> Install  Kubernetes packages.
+The May 2026 assignment instructed students to follow lecturer-provided material, including:
 
-```bash
-# Use the same versions to avoid issues with the installation.
-sudo apt-get install -y kubelet kubeadm kubectl
-```
+- `Widhi-yahya/kubernetes_installation_docker`
+- the lecturer's `LB_DEPLOYMENT.md` tutorial
+- a course worksheet submitted separately as PDF documentation
 
-> To hold the versions so that the versions will not get accidently upgraded.
+For that reason, the original step-by-step installation/tutorial text is **not presented as original technical writing by Syifani**. The portfolio focuses instead on retained manifests, workload configuration, scaling policy, troubleshooting decisions, and the resulting infrastructure understanding.
 
-```bash
-sudo apt-mark hold docker-ce kubelet kubeadm kubectl
-```
+See [COURSEWORK_CONTEXT.md](./COURSEWORK_CONTEXT.md) and [SOURCE_EVIDENCE.md](./SOURCE_EVIDENCE.md).
 
-> Enable the iptables bridge
+## Security cleanup
 
-```bash
-cat <<EOF | sudo tee /etc/modules-load.d/k8s.conf
-overlay
-br_netfilter
-EOF
+The historical lab documentation contained environment-specific IP addresses, demo credentials, and a database password. The portfolio version removes those values from the current branch and replaces them with placeholders or environment variables.
 
-sudo modprobe overlay
-sudo modprobe br_netfilter
+Historical commits may still preserve old coursework values, so **none of those values should ever be reused**.
 
-# sysctl params required by setup, params persist across reboots
-cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
-net.bridge.bridge-nf-call-iptables  = 1
-net.bridge.bridge-nf-call-ip6tables = 1
-net.ipv4.ip_forward                 = 1
-EOF
+See [SECURITY.md](./SECURITY.md).
 
-# Apply sysctl params without reboot
-sudo sysctl --system
-```
-### Disable SWAP
-> Disable swap on controlplane and dataplane nodes
+## Portfolio positioning
 
-```bash
-sudo swapoff -a
-```
+A concise recruiter-facing description:
 
-```bash
-sudo vim /etc/fstab
-# comment the line which starts with **swap.img**.
-```
+> **Kubernetes Autoscaling & Load-Balancing Lab** — Deployed a containerized Node.js/MySQL workload on a multi-node Kubernetes lab and configured service-based traffic distribution, health probes, persistent storage, Metrics Server, and an `autoscaling/v2` HPA with bounded replica scaling and stabilization policies. Extended the lab with ingress, load-balancing verification, monitoring notes, and deployment automation experiments.
 
-### On the Control Plane server (Master node)
-
-> Initialize the cluster by passing the cidr value and the value will depend on the type of network CLI you choose.
-
-**Calico**
-
-```bash
-# Calico network
-# Make sure to copy the join command
-sudo kubeadm init --apiserver-advertise-address=<control_plane_ip> --cri-socket unix:///var/run/cri-dockerd.sock  --pod-network-cidr=192.168.0.0/16
-
-# Or Use below command if the node network is not 192.168.x.x
-sudo kubeadm init --apiserver-advertise-address=<control_plane_ip> --cri-socket unix:///var/run/cri-dockerd.sock  --pod-network-cidr=10.244.0.0/16
-
-# Copy your join command and keep it safe.
-# Below is a sample format
-# Add --cri-socket /var/run/cri-dockerd.sock to the command
-kubeadm join <control_plane_ip>:6443 --token 31rvbl.znk703hbelja7qbx --cri-socket unix:///var/run/cri-dockerd.sock --discovery-token-ca-cert-hash sha256:3dd5f401d1c86be4axxxxxxxxxx61ce965f5xxxxxxxxxxf16cb29a89b96c97dd
-```
-
-> To start using the cluster with current user.
-
-```bash
-mkdir -p $HOME/.kube
-sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
-sudo chown $(id -u):$(id -g) $HOME/.kube/config
-```
-
-> To set up the Calico network
-
-```bash
-# Use this if you have initialised the cluster with Calico network add on.
-kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.2/manifests/tigera-operator.yaml
-
-curl https://raw.githubusercontent.com/projectcalico/calico/v3.28.2/manifests/custom-resources.yaml -O
-
-# Change the ip to 10.244.0.0/16 if the node network is 192.168.x.x
-kubectl create -f custom-resources.yaml
-
-```
-
-> Check the nodes
-
-```bash
-# Check the status on the master node.
-kubectl get nodes
-```
-
-### On each of Data plane node (Worker node)
-
-> Joining the node to the cluster:
-
-> Don't forget to include *--cri-socket unix:///var/run/cri-dockerd.sock* with the join command
-
-```bash
-sudo kubeadm join $controller_private_ip:6443 --token $token --discovery-token-ca-cert-hash $hash
-#Ex:
-# kubeadm join <control_plane_ip>:6443 --cri-socket unix:///var/run/cri-dockerd.sock --token 31rvbl.znk703hbelja7qbx --discovery-token-ca-cert-hash sha256:3dd5f401d1c86be4axxxxxxxxxx61ce965f5xxxxxxxxxxf16cb29a89b96c97dd
-# sudo kubeadm join 10.34.7.115:6443 --cri-socket unix:///var/run/cri-dockerd.sock --token kwdszg.aze47y44h7j74x6t --discovery-token-ca-cert-hash sha256:3bd51b39b3a166a4ba5914fc3a19b61cfe81789965da6ac23435edb6aeed9e0d
-```
-
-**TIP**
-
-> If the joining code is lost, it can retrieve using below command
-
-```bash
-kubeadm token create --print-join-command
-```
-
-### To install metrics server (Master node)
-
-```bash
-git clone https://github.com/mialeevs/kubernetes_installation_docker.git
-cd kubernetes_installation_docker/
-kubectl apply -f metrics-server.yaml
-cd
-rm -rf kubernetes_installation_docker/
-```
-
-### Installing Dashboard (Master node)
-
-1. *Installing Helm:*
-Download and install Helm with the following commands:
-```bash
-     curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
-     chmod +x get_helm.sh
-     ./get_helm.sh
-     helm   
-```
-3. *Adding the Kubernetes Dashboard Helm Repository:*
-Add the repository and verify it:
-```bash   
-     helm repo add kubernetes-dashboard https://kubernetes.github.io/dashboard/
-     helm repo list    
-```
-5. *Installing Kubernetes Dashboard Using Helm:*
-Install it in the `kubernetes-dashboard` namespace:
-```bash     
-     helm upgrade --install kubernetes-dashboard kubernetes-dashboard/kubernetes-dashboard --create-namespace --namespace kubernetes-dashboard
-     kubectl get pods,svc -n kubernetes-dashboard  
-```
-7. *Accessing the Dashboard:*
-Expose the dashboard using a NodePort:
-```bash      
-     kubectl expose deployment kubernetes-dashboard-kong --name k8s-dash-svc --type NodePort --port 443 --target-port 8443 -n kubernetes-dashboard
-```
-run: kubectl get pods,svc -n kubernetes-dashboard
-use this port to access the dashboard from phy node IP: 
-....
-service/k8s-dash-svc                           NodePort    10.110.85.135   <none>        443:30346/TCP   23s
-
-
-9. *Generating a Token for Login:*
-Create a service account and generate a token:
-```bash
-   nano k8s-dash.yaml
-```
-
-```bash
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: widhi
-  namespace: kube-system
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: widhi-admin
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: cluster-admin
-subjects:
-- kind: ServiceAccount
-  name: widhi
-  namespace: kube-system
-```
-then run:
-```bash
-kubectl apply -f k8s-dash.yaml
-```
-10. Generate the token:    
-     kubectl create token widhi -n kube-system
-
-
+**Project type:** Infrastructure / Kubernetes / DevOps coursework  
+**Context:** FILKOM Universitas Brawijaya — May 2026
