@@ -15,17 +15,31 @@ ROOT = Path(__file__).resolve().parents[1]
 K8S = ROOT / "k8s-login-app" / "k8s"
 
 
-def load(path: Path) -> dict:
+def load_all(path: Path) -> list[dict]:
     docs = [doc for doc in yaml.safe_load_all(path.read_text(encoding="utf-8")) if doc]
+    if not docs:
+        raise AssertionError(f"{path.name}: no YAML document found")
+    for index, doc in enumerate(docs, 1):
+        if not isinstance(doc, dict):
+            raise AssertionError(
+                f"{path.name}: YAML document {index} must be a mapping",
+            )
+    return docs
+
+
+def one(parsed: dict[str, list[dict]], name: str) -> dict:
+    docs = parsed[name]
     if len(docs) != 1:
-        raise AssertionError(f"{path.name}: expected exactly one YAML document")
-    if not isinstance(docs[0], dict):
-        raise AssertionError(f"{path.name}: top-level document must be a mapping")
+        raise AssertionError(f"{name}: expected one resource, found {len(docs)}")
     return docs[0]
 
 
 def env_by_name(container: dict) -> dict[str, dict]:
-    return {item["name"]: item for item in container.get("env", []) if isinstance(item, dict) and "name" in item}
+    return {
+        item["name"]: item
+        for item in container.get("env", [])
+        if isinstance(item, dict) and "name" in item
+    }
 
 
 def main() -> int:
@@ -33,21 +47,40 @@ def main() -> int:
     if not yaml_files:
         raise AssertionError("no Kubernetes YAML manifests found")
 
-    parsed = {path.name: load(path) for path in yaml_files}
+    parsed = {path.name: load_all(path) for path in yaml_files}
+    resource_count = sum(len(docs) for docs in parsed.values())
 
     # Prevent accidental replacement of portfolio placeholders with credentials.
-    for name, doc in parsed.items():
-        if doc.get("kind") != "Secret":
-            continue
-        for key, value in (doc.get("stringData") or {}).items():
-            upper = str(key).upper()
-            if any(token in upper for token in ("PASSWORD", "SECRET", "TOKEN", "API_KEY")):
-                text = str(value)
-                if "REPLACE" not in text.upper():
-                    raise AssertionError(f"{name}: secret-like key {key} must remain a placeholder")
+    for name, docs in parsed.items():
+        for doc in docs:
+            if doc.get("kind") != "Secret":
+                continue
+            for key, value in (doc.get("stringData") or {}).items():
+                upper = str(key).upper()
+                if any(
+                    token in upper
+                    for token in ("PASSWORD", "SECRET", "TOKEN", "API_KEY")
+                ):
+                    text = str(value)
+                    if "REPLACE" not in text.upper():
+                        raise AssertionError(
+                            f"{name}: secret-like key {key} must remain a placeholder",
+                        )
 
-    deployment = parsed["web-deployment.yaml"]
-    if deployment.get("kind") != "Deployment" or deployment.get("metadata", {}).get("name") != "login-app":
+    # Multi-document files are valid Kubernetes manifests. The retained local
+    # storage manifest intentionally contains StorageClass + PersistentVolume.
+    pv_local = parsed.get("pv-local.yaml", [])
+    pv_kinds = {doc.get("kind") for doc in pv_local}
+    if pv_kinds != {"StorageClass", "PersistentVolume"}:
+        raise AssertionError(
+            "pv-local.yaml must retain StorageClass + PersistentVolume resources",
+        )
+
+    deployment = one(parsed, "web-deployment.yaml")
+    if (
+        deployment.get("kind") != "Deployment"
+        or deployment.get("metadata", {}).get("name") != "login-app"
+    ):
         raise AssertionError("web-deployment.yaml must define Deployment/login-app")
 
     spec = deployment["spec"]
@@ -82,8 +115,11 @@ def main() -> int:
         if ref.get("name") != "mysql-secret" or ref.get("key") != secret_key:
             raise AssertionError(f"{variable} must come from mysql-secret/{secret_key}")
 
-    service = parsed["web-service.yaml"]
-    if service.get("kind") != "Service" or service.get("metadata", {}).get("name") != "login-app":
+    service = one(parsed, "web-service.yaml")
+    if (
+        service.get("kind") != "Service"
+        or service.get("metadata", {}).get("name") != "login-app"
+    ):
         raise AssertionError("web-service.yaml must define Service/login-app")
     if service["spec"].get("selector") != selector:
         raise AssertionError("Service selector must match Deployment labels")
@@ -91,7 +127,7 @@ def main() -> int:
     if not service_ports or service_ports[0].get("targetPort") != 3000:
         raise AssertionError("Service must route traffic to application port 3000")
 
-    hpa = parsed["login-app-hpa.yaml"]
+    hpa = one(parsed, "login-app-hpa.yaml")
     target = hpa["spec"]["scaleTargetRef"]
     if (target.get("kind"), target.get("name")) != ("Deployment", "login-app"):
         raise AssertionError("HPA must target Deployment/login-app")
@@ -111,8 +147,11 @@ def main() -> int:
     if behavior.get("scaleDown", {}).get("stabilizationWindowSeconds") != 300:
         raise AssertionError("scale-down stabilization must remain 300 seconds")
 
-    print(f"Validated {len(yaml_files)} Kubernetes YAML manifests")
-    print("- YAML syntax is parseable")
+    print(
+        f"Validated {len(yaml_files)} Kubernetes YAML files "
+        f"containing {resource_count} resources",
+    )
+    print("- YAML syntax is parseable, including multi-document manifests")
     print("- secret-like values remain placeholders")
     print("- Deployment, Service, probes, and Secret refs are internally consistent")
     print("- HPA target, replica bounds, CPU threshold, and stabilization are preserved")
