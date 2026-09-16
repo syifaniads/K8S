@@ -3,6 +3,7 @@
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-HPA%20%2B%20Ingress-326CE5)](./AUTOSCALING.md)
 [![Observability](https://img.shields.io/badge/metrics-Metrics%20Server-111827)](./OBSERVABILITY.md)
 [![Workload](https://img.shields.io/badge/workload-Node.js%20%2B%20MySQL-339933)](./ARCHITECTURE.md)
+[![Validation](https://img.shields.io/badge/manifests-static%20validation-2563EB)](./scripts/validate_k8s_manifests.py)
 [![Coursework](https://img.shields.io/badge/context-FILKOM%20DevOps%20Coursework-7A1FA2)](./COURSEWORK_CONTEXT.md)
 [![Role](https://img.shields.io/badge/role-Group%20Lead-0A66C2)](./TEAM_ATTRIBUTION.md)
 
@@ -102,6 +103,24 @@ The retained HPA targets `Deployment/login-app` using `autoscaling/v2`.
 
 See [AUTOSCALING.md](./AUTOSCALING.md).
 
+## Executable manifest integrity checks
+
+The retained manifests are now guarded by a small deterministic validator so a reviewer can distinguish **configuration evidence** from narrative documentation.
+
+[`scripts/validate_k8s_manifests.py`](./scripts/validate_k8s_manifests.py) parses every Kubernetes YAML file and verifies several cross-resource invariants:
+
+- secret-like values in the public `Secret` manifest remain placeholders;
+- `Deployment/login-app` selector and Pod-template labels match;
+- the application container exposes port `3000`;
+- liveness and readiness probes target `/health:3000`;
+- database/session settings are sourced from `mysql-secret` instead of embedded credentials;
+- `Service/login-app` selects the same Pods and forwards to port `3000`;
+- HPA still targets `Deployment/login-app` with bounds `2..4`, CPU target `80%`, and `60s/300s` stabilization windows.
+
+GitHub Actions executes these checks on pushes and pull requests through [`.github/workflows/manifest-validation.yml`](./.github/workflows/manifest-validation.yml).
+
+> This is **static configuration validation**, not a substitute for `kubectl apply --dry-run=server`, live scheduling, Metrics Server availability, traffic generation, or an end-to-end cluster test.
+
 ## Application workload
 
 The repository includes a small Express application used as a workload for the Kubernetes exercises. It provides:
@@ -148,6 +167,7 @@ See [OBSERVABILITY.md](./OBSERVABILITY.md).
 | Service / Ingress traffic distribution | [LOAD_BALANCING.md](./LOAD_BALANCING.md) |
 | Metrics and monitoring | [OBSERVABILITY.md](./OBSERVABILITY.md) |
 | Sanitized deployment walkthrough | [DEPLOYMENT.md](./DEPLOYMENT.md) |
+| Manifest integrity validator | [scripts/validate_k8s_manifests.py](./scripts/validate_k8s_manifests.py) |
 | Ansible automation experiment | [ANSIBLE_AUTOMATION.md](./ANSIBLE_AUTOMATION.md) |
 | Coursework provenance | [COURSEWORK_CONTEXT.md](./COURSEWORK_CONTEXT.md) |
 | Evidence map | [SOURCE_EVIDENCE.md](./SOURCE_EVIDENCE.md) |
